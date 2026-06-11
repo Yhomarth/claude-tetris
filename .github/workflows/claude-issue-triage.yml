@@ -5,97 +5,53 @@ on:
     types: [opened, edited]
 
 jobs:
-  triage:
+  format-issue:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
       id-token: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Initialize labels
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh label create "bug"           --color "d73a4a" --description "Something isn't working correctly"                           --force --repo ${{ github.repository }}
-          gh label create "enhancement"   --color "a2eeef" --description "New feature or improvement request"                          --force --repo ${{ github.repository }}
-          gh label create "question"      --color "d876e3" --description "Further information is requested"                            --force --repo ${{ github.repository }}
-          gh label create "performance"   --color "e4e669" --description "Relates to frame rate, drop speed, or loop timing"           --force --repo ${{ github.repository }}
-          gh label create "ui/ux"         --color "0075ca" --description "Visual layout, canvas rendering, or style concerns"          --force --repo ${{ github.repository }}
-          gh label create "game-logic"    --color "e57373" --description "Core mechanics: collision, rotation, scoring, line clearing"  --force --repo ${{ github.repository }}
-          gh label create "documentation" --color "0052cc" --description "Improvements or corrections to README or CLAUDE.md"           --force --repo ${{ github.repository }}
-
-      - name: Run Claude Issue Triage
-        id: claude-triage
+      - name: Format issue with Claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools Bash(gh issue *)"
           prompt: |
-            You are triaging a GitHub issue for a vanilla JavaScript Tetris game.
-            The repository has three source files: index.html (DOM structure), style.css (dark arcade theme), and game.js (~305 lines, all game logic, no classes, no build tools).
+            You are a GitHub issue formatter for a Tetris game project (vanilla JS/HTML/CSS, no dependencies).
 
-            ## Issue to triage
-
-            - Repository: ${{ github.repository }}
+            An issue was just ${{ github.event.action }} with the following details:
             - Issue number: #${{ github.event.issue.number }}
             - Title: ${{ github.event.issue.title }}
-            - Body:
-              ${{ github.event.issue.body }}
+            - Body: ${{ github.event.issue.body }}
+            - Author: ${{ github.event.issue.user.login }}
 
-            ## Your tasks
+            Your tasks:
+            1. **Add labels** based on the issue content. Use only these labels:
+               - `bug` — something is broken or behaving incorrectly
+               - `enhancement` — new feature or improvement request
+               - `question` — asking for help or clarification
+               - `documentation` — docs need updating
+               - `good first issue` — simple, beginner-friendly task
+               - `duplicate` — if it seems like a known/repeated problem
 
-            ### Step 1 — Apply labels
-            Choose 1 to 3 labels from ONLY this exact list (do not create or invent new labels):
-            - bug
-            - enhancement
-            - question
-            - performance
-            - ui/ux
-            - game-logic
-            - documentation
+            2. **Post a comment** on the issue that includes:
+               - A brief, friendly summary of what the issue is about (1-2 sentences)
+               - A "Formatted Report" section with:
+                 - **Type**: Bug / Feature Request / Question / Other
+                 - **Summary**: one clear sentence describing the problem or request
+                 - **Steps to reproduce** (for bugs): list them if not provided, ask the user to provide them if it's a bug
+                 - **Expected behavior** (for bugs): what should happen
+                 - **Suggested labels**: the labels you applied and why
+               - A closing note thanking the contributor
 
-            Apply the chosen labels by running:
-            gh issue edit ${{ github.event.issue.number }} --add-label "label1,label2" --repo ${{ github.repository }}
+            Use the `gh` CLI to apply labels and post the comment. Example commands:
+              gh issue edit ${{ github.event.issue.number }} --add-label "bug" --repo ${{ github.repository }}
+              gh issue comment ${{ github.event.issue.number }} --body "..." --repo ${{ github.repository }}
 
-            Label selection guidance:
-            - "bug" → reporter says something is broken or behaves unexpectedly during gameplay
-            - "enhancement" → feature request, new mechanic, or improvement idea
-            - "question" → asking how something works; seeking clarification
-            - "performance" → mentions lag, frame rate, speed, the game loop (loop function), or dropInterval
-            - "ui/ux" → mentions visuals, colors, canvas size, overlay, HUD layout, style.css, drawBlock, drawGrid, draw, drawNext
-            - "game-logic" → mentions collision (collide), rotation (tryRotate, rotateCW), line clearing (clearLines), scoring (LINE_SCORES), piece spawning (spawn, randomPiece), ghost piece (ghostY), hard/soft drop (hardDrop, softDrop), lock (lockPiece, merge)
-            - "documentation" → mentions README, CLAUDE.md, code comments, or instructions
-
-            ### Step 2 — Post a diagnostic comment
-            Post exactly one comment on the issue using:
-            gh issue comment ${{ github.event.issue.number }} --body "COMMENT_BODY" --repo ${{ github.repository }}
-
-            The comment must follow this exact structure (use these markdown headers verbatim):
-
-            ### Problem Classification
-            One sentence: what category of problem this is and why.
-
-            ### Affected Code Areas
-            List the specific functions or constants from game.js most relevant to this issue. Use this inventory:
-            - Constants: COLS, ROWS, BLOCK, COLORS, PIECES, LINE_SCORES
-            - Board/pieces: createBoard, randomPiece, collide
-            - Rotation/movement: rotateCW, tryRotate
-            - Piece lifecycle: merge, clearLines, ghostY, hardDrop, softDrop, lockPiece, spawn
-            - Rendering: drawBlock, drawGrid, draw, drawNext
-            - State/lifecycle: updateHUD, endGame, togglePause, loop, init
-            - HTML elements: #board (canvas 300x600), #next-canvas (120x120), #score, #lines, #level, #overlay
-            - CSS: .overlay, .panel, .value, kbd
-
-            ### Potential Solution Approaches
-            2 to 4 concise bullet points with actionable approaches specific to this codebase.
-
-            ### Complexity Estimate
-            One of: Low (< 1 hour, config change or isolated fix) | Medium (1-4 hours, touches 1-2 functions) | High (4+ hours, architectural change or multiple files).
-            One sentence explaining the estimate.
-
-            Important: do not ask for clarification. Triage the issue as-is. If ambiguous, label it "question".
+            Be concise, helpful, and friendly. Do not over-engineer the response.
