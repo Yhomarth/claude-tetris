@@ -55,3 +55,5 @@ jobs:
               gh issue comment ${{ github.event.issue.number }} --body "..." --repo ${{ github.repository }}
 
             Be concise, helpful, and friendly. Do not over-engineer the response.
+
+            **Important:** Write the entire comment body using **GitHub-flavored Markdown (GFM)** so it renders correctly in the GitHub UI. Use `**bold**`, `##` headers, `-` bullet lists, and fenced code blocks where appropriate.
